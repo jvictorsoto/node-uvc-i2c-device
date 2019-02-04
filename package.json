@@ -1,0 +1,22 @@
+{
+  "author": "J. Victor Soto",
+  "bundleDependencies": false,
+  "deprecated": false,
+  "description": "",
+  "files": [
+    "binding.gyp",
+    "uvcI2cDevice.cc",
+    "UVCLinux.h",
+    "index.js",
+    "package.json"
+  ],
+  "gypfile": true,
+  "license": "ISC",
+  "main": "index.js",
+  "name": "uvc-i2c-device",
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "version": "1.0.6"
+}
