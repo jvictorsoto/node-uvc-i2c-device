@@ -23,11 +23,26 @@ v8::Local<v8::Object> getInputSignal(const v8::FunctionCallbackInfo<v8::Value> &
   }
 
   int openDevice = UVC_OPEN_DEVICE_EX(devicePath, &bIsOurDevice, &pDevice);
+  if (openDevice == UVC_RS_DEVICE_CREATE_FAILED)
+  {
+    v8::Local<v8::Object> result = v8::Object::New(isolate);
+    result->Set(v8::String::NewFromUtf8(isolate, "error"),
+                v8::String::NewFromUtf8(isolate, "device path does not exist"));
+
+    return result;
+  }
 
   ULONG nWidth, nHeight, nFPS;
   BOOL bIs_1000_1001, bIsInterleaved, bIsSignalLocked, bIsHDCP, bIsHDMI;
 
-  UVC_GET_VIDEO_FORMAT_POLLING_READ(pDevice, &nWidth, &nHeight, &nFPS, &bIs_1000_1001, &bIsInterleaved, &bIsSignalLocked, &bIsHDCP, &bIsHDMI);
+  if (UVC_RS_SUCCESSFUL != UVC_GET_VIDEO_FORMAT_POLLING_READ(pDevice, &nWidth, &nHeight, &nFPS, &bIs_1000_1001, &bIsInterleaved, &bIsSignalLocked, &bIsHDCP, &bIsHDMI))
+  {
+    v8::Local<v8::Object> result = v8::Object::New(isolate);
+    result->Set(v8::String::NewFromUtf8(isolate, "error"),
+                v8::String::NewFromUtf8(isolate, "impossible to read hid data. Maybe not a grabber?"));
+
+    return result;
+  }
   UVC_CLOSE_DEVICE(pDevice);
 
   v8::Local<v8::Object> result = v8::Object::New(isolate);

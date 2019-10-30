@@ -12,6 +12,7 @@
 #include <string>
 #include <linux/version.h>
 #include "UVCLinuxControl.h"
+#include "UVCLinux.h"
 
 typedef int BOOLEAN;
 typedef int BOOL;
@@ -39,19 +40,20 @@ typedef void *PVOID;
 typedef PVOID HWND;
 typedef PVOID HANDLE;
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,1,0)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3, 1, 0)
 /* The first uint8_t of SFEATURE and GFEATURE is the report number */
-#define HIDIOCSFEATURE(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x06, len)
-#define HIDIOCGFEATURE(len)    _IOC(_IOC_WRITE|_IOC_READ, 'H', 0x07, len)
+#define HIDIOCSFEATURE(len) _IOC(_IOC_WRITE | _IOC_READ, 'H', 0x06, len)
+#define HIDIOCGFEATURE(len) _IOC(_IOC_WRITE | _IOC_READ, 'H', 0x07, len)
 #endif
 
-#define _W64 __attribute__((mode (__pointer__)))
+#define _W64 __attribute__((mode(__pointer__)))
 
-typedef _W64 uintptr_t ULONG_PTR,DWORD_PTR;
+typedef _W64 uintptr_t ULONG_PTR, DWORD_PTR;
 
-#define LOBYTE(w)           ((uint8_t)(((DWORD_PTR)(w)) & 0xff))
+#define LOBYTE(w) ((uint8_t)(((DWORD_PTR)(w)) & 0xff))
 
-struct PD570_HID_ID {
+struct PD570_HID_ID
+{
 	static const int I2C_READ_SET_ID = 9;
 	static const int I2C_READ_GET_ID = 10;
 	static const int I2C_WRITE_ID = 11;
@@ -59,57 +61,69 @@ struct PD570_HID_ID {
 	static const int GET_RES_ID = 19;
 };
 
-struct PD570_HID_CONSTS {
+struct PD570_HID_CONSTS
+{
 	static const int MAX_COMM_READ_BUFFER_SIZE = 32;
 };
 
-int hid_send_feature_report(int fd, const unsigned char* data, size_t length) {
+int hid_send_feature_report(int fd, const unsigned char *data, size_t length)
+{
 	return ioctl(fd, HIDIOCSFEATURE(length), data);
 }
 
-int hid_get_feature_report(int fd, unsigned char* data, size_t length) {
+int hid_get_feature_report(int fd, unsigned char *data, size_t length)
+{
 	return ioctl(fd, HIDIOCGFEATURE(length), data);
 }
 
-int hid_report_read(int fd, void* p_buffer, size_t i_size) {
-	return hid_get_feature_report(fd, (unsigned char*)p_buffer, i_size);
+int hid_report_read(int fd, void *p_buffer, size_t i_size)
+{
+	return hid_get_feature_report(fd, (unsigned char *)p_buffer, i_size);
 }
 
-int hid_report_write(int fd, void* p_buffer, size_t i_size) {
-	return hid_send_feature_report(fd, (const unsigned char*)p_buffer, i_size);
+int hid_report_write(int fd, void *p_buffer, size_t i_size)
+{
+	return hid_send_feature_report(fd, (const unsigned char *)p_buffer, i_size);
 }
 
-bool find_hid_dev_path( int devNum, ULONG pszDeviceID, char* outPath ){
+bool find_hid_dev_path(int devNum, ULONG pszDeviceID, char *outPath)
+{
 	int err = 0;
 
-	for(int i = 0;;++i) {
+	for (int i = 0;; ++i)
+	{
 		char pszDeviceName[128];
 		sprintf(pszDeviceName, "hidraw%d", i);
 		std::string strDeviceName = pszDeviceName;
 		std::string strDevicePath = "/dev/" + strDeviceName;
 
 		struct stat status;
-		if( -1 == stat(strDevicePath.c_str(), &status)) {
+		if (-1 == stat(strDevicePath.c_str(), &status))
+		{
 			break;
 		}
 
-		if( false == S_ISCHR(status.st_mode) ) {
+		if (false == S_ISCHR(status.st_mode))
+		{
 			break;
 		}
 
 		int fd = open(strDevicePath.c_str(), O_RDWR, 0);
 		// printf("[find_hid_dev_path] OPENING %s -> %d\n", strDevicePath.c_str(), fd);
-		if(fd == -1) {
+		if (fd == -1)
+		{
 			err = errno;
 			printf("%s(%d): open(\"%s\") failed, err=%d\n", __FUNCTION__, __LINE__, strDevicePath.c_str(), err);
 			break;
 		}
 
 		int _vid = -1, _pid = -1;
-		do {
+		do
+		{
 			hidraw_devinfo devinfo;
 			err = ioctl(fd, HIDIOCGRAWINFO, &devinfo);
-			if (err < 0) {
+			if (err < 0)
+			{
 				err = errno;
 				printf("%s(%d): ioctl(HIDIOCGRAWINFO) failed, err=%d\n", __FUNCTION__, __LINE__, err);
 				break;
@@ -117,7 +131,7 @@ bool find_hid_dev_path( int devNum, ULONG pszDeviceID, char* outPath ){
 
 			_vid = devinfo.vendor & 0xFFFF;
 			_pid = devinfo.product & 0xFFFF;
-		} while(false);
+		} while (false);
 		// printf("[find_hid_dev_path] CLOSING %d\n", fd);
 		close(fd);
 
@@ -125,20 +139,25 @@ bool find_hid_dev_path( int devNum, ULONG pszDeviceID, char* outPath ){
 
 		int vid = -1, pid = -1;
 		bool found = false;
-		for(int c = 0;;++c) {
-			if(pszDeviceID == 0) break;
+		for (int c = 0;; ++c)
+		{
+			if (pszDeviceID == 0)
+				break;
 
 			vid = (pszDeviceID & 0xFFFF0000) >> 16;
 			pid = (pszDeviceID & 0x0000FFFF);
 
-			if(_vid == vid && _pid == pid) {
+			if (_vid == vid && _pid == pid)
+			{
 				found = true;
 				break;
 			}
 		}
 
-		if(devNum >= 0 && found) {
-			if(devNum == 0) {
+		if (devNum >= 0 && found)
+		{
+			if (devNum == 0)
+			{
 				strcpy(outPath, strDevicePath.c_str());
 
 				return true;
@@ -151,16 +170,18 @@ bool find_hid_dev_path( int devNum, ULONG pszDeviceID, char* outPath ){
 	return false;
 }
 
-int read_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, uint8_t* pData, uint32_t nLength) {
+int read_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, uint8_t *pData, uint32_t nLength)
+{
 	uint8_t buffer[5 + PD570_HID_CONSTS::MAX_COMM_READ_BUFFER_SIZE] = {
-		PD570_HID_ID::I2C_READ_SET_ID,
-		nDeviceAddress,
-		LOBYTE(nRegisterAddress),
-		nLength,
+			PD570_HID_ID::I2C_READ_SET_ID,
+			nDeviceAddress,
+			LOBYTE(nRegisterAddress),
+			nLength,
 	};
 
 	int err = hid_report_write(fd, buffer, 4);
-	if(err < 0) {
+	if (err < 0)
+	{
 		err = errno;
 		printf("%s(%d): hid_report_write(I2C_READ_SET_ID) failed, err=%d\n", __FUNCTION__, __LINE__);
 
@@ -169,7 +190,8 @@ int read_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, ui
 
 	buffer[0] = PD570_HID_ID::I2C_READ_GET_ID;
 	err = hid_report_read(fd, buffer, 4 + PD570_HID_CONSTS::MAX_COMM_READ_BUFFER_SIZE);
-	if(err < 0) {
+	if (err < 0)
+	{
 		err = errno;
 		printf("%s(%d): hid_report_read(I2C_READ_GET_ID) failed, err=%d\n", __FUNCTION__, __LINE__);
 
@@ -181,12 +203,13 @@ int read_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, ui
 	return 0;
 }
 
-int write_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, uint8_t* pData, uint32_t nLength) {
+int write_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, uint8_t *pData, uint32_t nLength)
+{
 	uint8_t buffer[4 + PD570_HID_CONSTS::MAX_COMM_READ_BUFFER_SIZE] = {
-		PD570_HID_ID::I2C_WRITE_ID,
-		nDeviceAddress,
-		LOBYTE(nRegisterAddress),
-		nLength,
+			PD570_HID_ID::I2C_WRITE_ID,
+			nDeviceAddress,
+			LOBYTE(nRegisterAddress),
+			nLength,
 	};
 	memcpy(&buffer[4], pData, nLength);
 	memset(&buffer[4 + nLength], 0, sizeof(buffer) - 4 - nLength);
@@ -196,9 +219,10 @@ int write_i2c_data(int fd, uint32_t nDeviceAddress, uint32_t nRegisterAddress, u
 		LOGD("!!!! write_i2c_data %d 0x%X", i, (int)buffer[i]);
 	}
 #endif
-	
+
 	int err = hid_report_write(fd, buffer, 4 + PD570_HID_CONSTS::MAX_COMM_READ_BUFFER_SIZE);
-	if(err < 0) {
+	if (err < 0)
+	{
 		err = errno;
 		printf("%s(%d): hid_report_write(I2C_WRITE_ID) failed, err=%d\n", __FUNCTION__, __LINE__);
 
@@ -232,7 +256,6 @@ UVCLinuxControl::UVCLinuxControl()
 
 UVCLinuxControl::~UVCLinuxControl()
 {
-
 }
 
 /*
@@ -255,13 +278,21 @@ int UVCLinuxControl::OpenDeviceEx(char* pszDeviceID)
 
 	return 0;
 }*/
-int UVCLinuxControl::OpenDeviceEx(char* strDevicePath)
+int UVCLinuxControl::OpenDeviceEx(char *strDevicePath)
 {
+	struct stat status;
+	if (-1 == stat(strDevicePath, &status) || false == S_ISCHR(status.st_mode))
+	{
+		return UVC_RS_DEVICE_CREATE_FAILED;
+	}
+
+	// TODO: More checks
 	int fd = open(strDevicePath, O_RDWR, 0);
 	// printf("[OpenDeviceEx] OPENING %s -> %d\n", strDevicePath, fd);
 
-	if(fd < 0){
-		return 4;
+	if (fd < 0)
+	{
+		return UVC_RS_DEVICE_CREATE_FAILED;
 	}
 
 	g_fd = fd;
@@ -269,8 +300,7 @@ int UVCLinuxControl::OpenDeviceEx(char* strDevicePath)
 	return 0;
 }
 
-
-int UVCLinuxControl::GetVideoFormatPollingRead(unsigned long * pWidth, unsigned long * pHeight, unsigned long * pFPS, int * pIs_1000_1001, int * pIsInterleaced, int * pIsSignalLocked, int * pIsHDCP, int * pIsHDMI)
+int UVCLinuxControl::GetVideoFormatPollingRead(unsigned long *pWidth, unsigned long *pHeight, unsigned long *pFPS, int *pIs_1000_1001, int *pIsInterleaced, int *pIsSignalLocked, int *pIsHDCP, int *pIsHDMI)
 {
 	unsigned char pDevice_format[32] = "";
 
@@ -282,19 +312,41 @@ int UVCLinuxControl::GetVideoFormatPollingRead(unsigned long * pWidth, unsigned 
 
 	// printf("DEBUG: g_fd: %d\n", g_fd);
 
-	read_i2c_data(g_fd, 0x55, 0x00, (BYTE *)pDevice_format, 7);
+	int err = read_i2c_data(g_fd, 0x55, 0x00, (BYTE *)pDevice_format, 7);
+	if (err != 0) {
+		return err;
+	}
 
-	deivce_input_width = (pDevice_format[1]&0xff)| ((pDevice_format[2]&0xff)<<8);
-	deivce_input_height = (pDevice_format[3]&0xff)| ((pDevice_format[4]&0xff)<<8);
+	deivce_input_width = (pDevice_format[1] & 0xff) | ((pDevice_format[2] & 0xff) << 8);
+	deivce_input_height = (pDevice_format[3] & 0xff) | ((pDevice_format[4] & 0xff) << 8);
 	deivce_input_fps = pDevice_format[5];
 
 	detail_format = pDevice_format[6];
 
-	if((detail_format & 0x01) == 0x01){deivce_input_interleaved=1;}else{deivce_input_interleaved=0;}
-	if((detail_format & 0x02) == 0x02){deivce_input_is_1000_1001=1;}else{deivce_input_is_1000_1001=0;}
-	if((detail_format & 0x04) == 0x04){deivce_input_lock=1;}else{deivce_input_lock=0;}
-	if((detail_format & 0x08) == 0x08){deivce_input_hdcp=1;}else{deivce_input_hdcp=0;}
-	if((detail_format & 0x10) == 0x10){deivce_input_hdmi=1;}else{deivce_input_hdmi=0;}
+	if ((detail_format & 0x01) == 0x01)
+		deivce_input_interleaved = 1;
+	else
+		deivce_input_interleaved = 0;
+
+	if ((detail_format & 0x02) == 0x02)
+		deivce_input_is_1000_1001 = 1;
+	else
+		deivce_input_is_1000_1001 = 0;
+
+	if ((detail_format & 0x04) == 0x04)
+		deivce_input_lock = 1;
+	else
+		deivce_input_lock = 0;
+
+	if ((detail_format & 0x08) == 0x08)
+		deivce_input_hdcp = 1;
+	else
+		deivce_input_hdcp = 0;
+
+	if ((detail_format & 0x10) == 0x10)
+		deivce_input_hdmi = 1;
+	else
+		deivce_input_hdmi = 0;
 
 	// printf("GetVideoFormatPollingRead: %dx%d %dfps, interleaved:%d 1000_1001:%d lock:%d HDCP:%d HDMI:%d\n", deivce_input_width, deivce_input_height, deivce_input_fps, deivce_input_interleaved, deivce_input_is_1000_1001, deivce_input_lock, deivce_input_hdcp, deivce_input_hdmi);
 
@@ -314,7 +366,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 {
 	int set_input_type = 0x00;
 
-	if(nVideoInput == 0)
+	if (nVideoInput == 0)
 	{
 		set_input_type = 0x00;
 
@@ -322,7 +374,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 1)
+	if (nVideoInput == 1)
 	{
 		set_input_type = 0x01;
 
@@ -330,7 +382,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 2)
+	if (nVideoInput == 2)
 	{
 		set_input_type = 0x02;
 
@@ -338,7 +390,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 3)
+	if (nVideoInput == 3)
 	{
 		set_input_type = 0x03;
 
@@ -346,7 +398,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 4)
+	if (nVideoInput == 4)
 	{
 		set_input_type = 0x10;
 
@@ -354,7 +406,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 5)
+	if (nVideoInput == 5)
 	{
 		set_input_type = 0x11;
 
@@ -362,7 +414,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 6)
+	if (nVideoInput == 6)
 	{
 		set_input_type = 0x20;
 
@@ -370,7 +422,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 7)
+	if (nVideoInput == 7)
 	{
 		set_input_type = 0x21;
 
@@ -378,7 +430,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 8)
+	if (nVideoInput == 8)
 	{
 		set_input_type = 0x30;
 
@@ -386,7 +438,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 9)
+	if (nVideoInput == 9)
 	{
 		set_input_type = 0x31;
 
@@ -394,7 +446,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 10)
+	if (nVideoInput == 10)
 	{
 		set_input_type = 0x40;
 
@@ -402,7 +454,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 11)
+	if (nVideoInput == 11)
 	{
 		set_input_type = 0x41;
 
@@ -410,7 +462,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 12)
+	if (nVideoInput == 12)
 	{
 		set_input_type = 0x50;
 
@@ -418,14 +470,14 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 13)
+	if (nVideoInput == 13)
 	{
 		set_input_type = 0x51;
 
 		uint8_t bdata[] = {set_input_type};
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
-	if(nVideoInput == 14)
+	if (nVideoInput == 14)
 	{
 		set_input_type = 0x60;
 
@@ -433,7 +485,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 15)
+	if (nVideoInput == 15)
 	{
 		set_input_type = 0x61;
 
@@ -441,7 +493,7 @@ int UVCLinuxControl::WriteI2CData(unsigned long nVideoInput)
 		write_i2c_data(g_fd, 0x55, 0x09, bdata, sizeof(bdata));
 	}
 
-	if(nVideoInput == 16)
+	if (nVideoInput == 16)
 	{
 		set_input_type = 0x70;
 
